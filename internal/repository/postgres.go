@@ -14,6 +14,7 @@ import (
 type Postgres interface {
 	GetRefreshTokenInfo(userID string) (refreshTokenHash, accessTokenID string, err error)
 	SaveNewRefreshToken(userID, refreshTokenHash, accessTokenID string) error
+	GetUserEmail(userID string) (string, error)
 
 	ClosePostgresConnection() error
 }
@@ -57,6 +58,19 @@ func (p *postgres) SaveNewRefreshToken(userID, refreshTokenHash, accessTokenID s
 	}
 
 	return nil
+}
+
+func (p *postgres) GetUserEmail(userID string) (string, error) {
+	slog.Info("Postgres.GetUserEmail", "userID", userID)
+
+	query := `SELECT email FROM users WHERE id = $1`
+
+	var email string
+	if err := p.db.QueryRow(query, userID).Scan(&email); err != nil {
+		return "", fmt.Errorf("can't get user email: %w", err)
+	}
+
+	return email, nil
 }
 
 func (p *postgres) ClosePostgresConnection() error {

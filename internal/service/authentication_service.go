@@ -12,7 +12,7 @@ import (
 type AuthenticationService interface {
 	RefreshTokens(refreshToken, userIP string) (newAccessToken, newRefreshToken string, err error)
 	GetTokens(userID, userIP string) (accessToken, refreshToken string, err error)
-	SendIPChangedNotification(userID, userIP string)
+	CheckIPChanged(token, userIP string) (userID string, IPChanged bool, err error)
 }
 
 type authenticationService struct {
@@ -28,6 +28,7 @@ func (s *authenticationService) RefreshTokens(refreshTokenStr, userIP string) (n
 	}
 
 	writtenRefreshTokenHash, writtenAccessTokenID, err := s.r.GetRefreshTokenInfo(refreshToken.Subject)
+	slog.Debug("authenticationService.RefreshTokens", "writtenRefreshTokenHash", writtenRefreshTokenHash, "writtenAccessTokenID", writtenAccessTokenID)
 	if err != nil {
 		return "", "", fmt.Errorf("authenticationService.RefreshTokens: can't get refresh token info: %w", err)
 	}
@@ -58,6 +59,20 @@ func (s *authenticationService) RefreshTokens(refreshTokenStr, userIP string) (n
 	return newAccessToken, newRefreshToken, nil
 }
 
+func (s *authenticationService) CheckIPChanged(token, userIP string) (string, bool, error) {
+	slog.Info("authenticationService.CheckIPChanged")
+	refreshToken, err := s.jwt.ParseRefreshToken(token)
+	if err != nil {
+		return "", false, fmt.Errorf("authenticationService.CheckIPChanged: can't validate refresh token: %w", err)
+	}
+
+	if refreshToken.UserIP != userIP {
+		return refreshToken.Subject, true, nil
+	}
+
+	return refreshToken.Subject, false, nil
+}
+
 func (s *authenticationService) GetTokens(userID, userIP string) (accessToken, refreshToken string, err error) {
 	slog.Info("authenticationService.GetTokens")
 
@@ -76,11 +91,6 @@ func (s *authenticationService) GetTokens(userID, userIP string) (accessToken, r
 	}
 
 	return accessToken, refreshToken, nil
-}
-
-func (s *authenticationService) SendIPChangedNotification(userID, userIP string) {
-	// TODO: implement me
-	slog.Info("authenticationService.SendIPChangedNotification")
 }
 
 func NewAuthenticationService(r repository.Postgres, j jwt.JwtGenerator) AuthenticationService {

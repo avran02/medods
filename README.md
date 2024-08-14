@@ -18,3 +18,11 @@ ___
 - localhost:8080 - UI к БДшке
 - __localhost:3000/api/v1/get-tokens__ - получение токенов через _GET_ запрос 
 - __localhost:3000/api/v1/refresh-tokens__ - Обновление токенов оп refresh токену через _POST_ запрос. Данные передаются в JSON 
+
+___
+Для проверки, что писмо отправляется при смене IP можно использовать:
+```
+docker exec -it <app container id> sh
+apk add curl
+curl -X POST -H Content-Type: application/json -d '{"refresh_token": "ValidRefreshToken"}' "http://localhost:3000/api/v1/refresh-tokens"
+```

@@ -18,7 +18,7 @@ type AuthenticationController interface {
 }
 
 type authenticationController struct {
-	s service.AuthenticationService
+	s service.Service
 }
 
 func (c *authenticationController) GetTokens(w http.ResponseWriter, r *http.Request) {
@@ -54,7 +54,8 @@ func (c *authenticationController) RefreshTokens(w http.ResponseWriter, r *http.
 		return
 	}
 
-	accessToken, refreshToken, err := c.s.RefreshTokens(req.RefreshToken, getUserIP(r))
+	userIP := getUserIP(r)
+	accessToken, refreshToken, err := c.s.RefreshTokens(req.RefreshToken, userIP)
 	if err != nil {
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
 			slog.Error("authenticationController.RefreshTokens: wrong refresh token", "err", err.Error())
@@ -64,6 +65,21 @@ func (c *authenticationController) RefreshTokens(w http.ResponseWriter, r *http.
 		slog.Error("authenticationController.RefreshTokens: can't refresh tokens", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	userID, IPChanged, err := c.s.CheckIPChanged(req.RefreshToken, userIP)
+	if err != nil {
+		slog.Error("authenticationController.RefreshTokens: can't check IP changed", "err", err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if IPChanged {
+		if err := c.s.SendIPChangedNotification(userID, userIP); err != nil && !errors.Is(err, service.ErrSMTPUnavailable) {
+			slog.Error("authenticationController.RefreshTokens: can't send IP changed notification", "err", err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	resp := dto.RefreshTokensResponse{
@@ -95,7 +111,7 @@ func getUserIP(r *http.Request) string {
 	return ip
 }
 
-func NewAuthenticationController(s service.AuthenticationService) AuthenticationController {
+func NewAuthenticationController(s service.Service) AuthenticationController {
 	return &authenticationController{
 		s: s,
 	}

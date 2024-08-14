@@ -22,7 +22,7 @@ func New() *App {
 	logger.Setup(config.ServerConfig)
 	repo := repository.New(&config.DBConfig)
 	jwtGenerator := jwt.NewJwtGenerator(config.JWTConfig)
-	service := service.New(repo, jwtGenerator)
+	service := service.New(repo, jwtGenerator, config.SMTPConfig)
 	controller := controller.New(service)
 	router := router.New(controller, config.ServerConfig, func() {
 		if err := repo.ClosePostgresConnection(); err != nil {
